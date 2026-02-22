@@ -1,7 +1,6 @@
 streamlit
 pandas
 numpy
-prophet==1.1.5
 matplotlib
 plotly
-cmdstanpy
+scikit-learn
