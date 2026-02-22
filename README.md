@@ -1,160 +1,67 @@
 🌬️ Wind Energy Feasibility Dashboard
 
- Project Overview
+A Streamlit web app that analyzes wind speed data, predicts future wind trends, and estimates wind turbine power generation.
 
-The Wind Energy Feasibility Dashboard is a Streamlit-based web application that analyzes historical wind speed data, forecasts future wind trends using time series modeling, and estimates potential energy production from wind turbines.
+🔗 Live App: https://1m1b.onrender.com/
 
-This tool helps evaluate whether a location is suitable for wind energy generation by combining:
+📌 About the Project
 
-📊 Data analysis
+This dashboard helps evaluate whether a location is suitable for wind energy production.
+It combines wind data analysis, forecasting, and turbine energy estimation in one interactive interface.
 
-🔮 Time series forecasting
+Users can upload their own dataset or use sample data to:
 
-⚡ Power output estimation
+Analyze historical wind speed
 
-📈 Interactive visualizations
+Forecast future wind speeds
 
-🎯 Project Objectives
+Estimate turbine power output
 
-Analyze historical wind speed data
+Calculate capacity factor and annual energy generation
 
-Forecast future wind speeds using machine learning
-
-Estimate wind turbine power generation
-
-Calculate capacity factor and annual energy production
-
-Provide interactive and visual insights through a web dashboard
-
-🛠️ Technologies Used
+ Built With
 
 Python 3.14
 
-Streamlit – Web application framework
+Streamlit
 
-Prophet – Time series forecasting model
+Prophet (time series forecasting)
 
-Pandas & NumPy – Data processing
+Pandas & NumPy
 
-Plotly & Matplotlib – Data visualization
+Plotly & Matplotlib
 
- How the Project Works
-1️⃣ Data Input
+⚙️ How It Works
 
-Users can:
+Data Input – Upload CSV file (ds for date, y for wind speed) or use sample data.
 
-Upload their own CSV file (with ds and y columns)
+Forecasting – Prophet model predicts future wind speed trends.
 
-Or use generated sample wind speed data
+Energy Estimation – Power is calculated using turbine specifications (cut-in, rated, cut-out speeds).
 
-Where:
-
-ds = Date
-
-y = Wind speed (m/s)
-
-2️⃣ Forecasting (Machine Learning)
-
-The app uses Prophet, a time series forecasting model, to:
-
-Learn seasonal patterns
-
-Detect trends
-
-Predict future wind speeds
-
-Forecast values are adjusted to prevent negative wind speeds.
-
-3️⃣ Wind Turbine Energy Calculation
-
-Power output is calculated using a simplified wind turbine power curve:
-
-Below cut-in speed → 0 power
-
-Between cut-in and rated speed → Cubic growth
-
-Above rated speed → Constant rated power
-
-Above cut-out speed → 0 power
-
-Then the app calculates:
-
-⚡ Average Power Output (kW)
-
-📊 Capacity Factor (%)
-
-🔋 Estimated Annual Energy Production (MWh)
-
-📈 Dashboard Features
-📊 Data Overview
+The dashboard then shows:
 
 Average wind speed
 
-Maximum wind speed
+Forecast graphs
 
-Interactive wind speed chart
+Estimated power output
 
-Raw data table
+Capacity factor
 
-🔮 Forecast Section
-
-Future wind speed prediction
-
-Trend & seasonality breakdown
-
-Interactive forecast visualization
-
-⚡ Energy Estimation
-
-Turbine model selection
-
-Custom turbine configuration
-
-Power vs Wind speed visualization
-
-Capacity factor calculation
+Annual energy production
 
 🚀 Deployment
 
-The application is deployed using:
-
-Render (Cloud hosting platform)
-
-Streamlit server configuration:
+Hosted on Render using:
 
 streamlit run app.py --server.port $PORT --server.address 0.0.0.0
 📂 Project Structure
-├── app.py
-├── requirements.txt
-├── runtime.txt
-└── README.md
-🌍 Real-World Use Case
 
-This project can be useful for:
-
-Renewable energy feasibility studies
-
-Academic research projects
-
-Wind farm pre-analysis
-
-Engineering simulations
-
-Data science portfolio demonstration
-
-🔥 Future Improvements
-
-Add multiple forecasting model comparison
-
-Include real weather API integration
-
-Add economic cost-benefit analysis
-
-Improve UI/UX design
-
-Add downloadable PDF report generation
-
-👨‍💻 Author
+    app.py
+    requirements.txt
+    runtime.txt
+    README.md
+👩‍💻 Author
 
 Gitabai Sabane
-
