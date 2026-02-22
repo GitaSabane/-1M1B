@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from prophet import Prophet
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import Pipeline
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -16,11 +18,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# ------------------ TITLE ------------------
 st.title("🌬️ Wind Energy Feasibility Dashboard")
 st.markdown("""
-Analyze historical wind speed data, forecast future trends, and estimate
-wind turbine energy production.
+Analyze historical wind speed data, forecast future trends,
+and estimate wind turbine energy production.
 """)
 
 # ------------------ SIDEBAR ------------------
@@ -41,7 +42,6 @@ with st.sidebar:
             st.info("Please upload a CSV file.")
             st.stop()
     else:
-        # Generate sample dataset
         dates = pd.date_range(start="2020-01-01", end="2023-12-31", freq="D")
         wind = np.random.normal(7.5, 2.5, len(dates))
         seasonal = 2 * np.sin(2 * np.pi * np.arange(len(dates)) / 365)
@@ -54,17 +54,15 @@ with st.sidebar:
 
         st.success("Sample data loaded successfully!")
 
-    # ------------------ TURBINE SETTINGS ------------------
     st.header("⚙️ Turbine Specifications")
 
     turbine_model = st.selectbox(
         "Select Turbine Model:",
-        ["Generic 1.5 MW", "Vestas V90-2.0 MW", "GE 2.5-120", "Custom"]
+        ["Generic 1.5 MW", "GE 2.5-120", "Custom"]
     )
 
     turbine_specs = {
         "Generic 1.5 MW": [3.0, 12.0, 25.0, 1500],
-        "Vestas V90-2.0 MW": [4.0, 13.0, 25.0, 2000],
         "GE 2.5-120": [3.5, 12.5, 25.0, 2500]
     }
 
@@ -76,75 +74,74 @@ with st.sidebar:
         cut_out_speed = st.slider("Cut-out Speed (m/s)", 20.0, 25.0, 25.0)
         rated_power = st.number_input("Rated Power (kW)", 1000, 5000, 1500)
 
-    # Forecast settings
     st.header("🔮 Forecast Settings")
     forecast_days = st.slider("Days to Forecast", 30, 365, 90)
 
-# ------------------ DATA VALIDATION ------------------
+# ------------------ VALIDATION ------------------
 if "ds" not in df.columns or "y" not in df.columns:
-    st.error("CSV must contain 'ds' (date) and 'y' (wind speed) columns.")
+    st.error("CSV must contain 'ds' and 'y' columns.")
     st.stop()
 
 df["ds"] = pd.to_datetime(df["ds"])
 df = df.sort_values("ds")
 
+# Create time index
+df["time_index"] = np.arange(len(df))
+
 # ------------------ TABS ------------------
-tab1, tab2, tab3 = st.tabs([
-    "📈 Data Overview",
-    "🔍 Forecast",
-    "⚡ Energy Estimation"
-])
+tab1, tab2, tab3 = st.tabs(["📈 Data Overview", "🔍 Forecast", "⚡ Energy Estimation"])
 
 # ================= TAB 1 =================
 with tab1:
     st.subheader("Historical Wind Data")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Average Wind Speed", f"{df['y'].mean():.2f} m/s")
-    col2.metric("Maximum Wind Speed", f"{df['y'].max():.2f} m/s")
-    col3.metric("Total Data Points", len(df))
+    st.metric("Average Wind Speed", f"{df['y'].mean():.2f} m/s")
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df["ds"], y=df["y"], mode="lines", name="Wind Speed"))
-    fig.update_layout(
-        title="Historical Wind Speed",
-        xaxis_title="Date",
-        yaxis_title="Wind Speed (m/s)"
-    )
+    fig.add_trace(go.Scatter(x=df["ds"], y=df["y"], mode="lines"))
+    fig.update_layout(title="Historical Wind Speed")
     st.plotly_chart(fig, use_container_width=True)
-
-    if st.checkbox("Show Raw Data"):
-        st.dataframe(df)
 
 # ================= TAB 2 =================
 with tab2:
-    st.subheader("Wind Speed Forecast")
+    st.subheader("Wind Speed Forecast (Polynomial Regression)")
 
     if st.button("Generate Forecast"):
 
-        with st.spinner("Training Prophet model..."):
+        model = Pipeline([
+            ("poly", PolynomialFeatures(degree=3)),
+            ("lr", LinearRegression())
+        ])
 
-            model = Prophet(
-                yearly_seasonality=True,
-                weekly_seasonality=True,
-                daily_seasonality=False
-            )
+        X = df[["time_index"]]
+        y = df["y"]
 
-            model.fit(df)
+        model.fit(X, y)
 
-            future = model.make_future_dataframe(periods=forecast_days)
-            forecast = model.predict(future)
+        future_index = np.arange(len(df) + forecast_days)
+        future_dates = pd.date_range(
+            start=df["ds"].iloc[0],
+            periods=len(future_index),
+            freq="D"
+        )
 
-            forecast["yhat"] = np.maximum(forecast["yhat"], 0)
+        future_df = pd.DataFrame({"time_index": future_index})
+        predictions = model.predict(future_df)
 
-            st.session_state.forecast = forecast
+        predictions = np.maximum(predictions, 0)
 
-            fig1 = model.plot(forecast)
-            st.pyplot(fig1)
+        forecast = pd.DataFrame({
+            "ds": future_dates,
+            "yhat": predictions
+        })
 
-            st.subheader("Forecast Components")
-            fig2 = model.plot_components(forecast)
-            st.pyplot(fig2)
+        st.session_state.forecast = forecast
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df["ds"], y=df["y"], name="Historical"))
+        fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], name="Forecast"))
+        fig.update_layout(title="Wind Speed Forecast")
+        st.plotly_chart(fig, use_container_width=True)
 
 # ================= TAB 3 =================
 with tab3:
@@ -175,14 +172,8 @@ with tab3:
         col3.metric("Estimated Annual Energy", f"{annual_energy:.0f} MWh")
 
         fig = make_subplots(specs=[[{"secondary_y": True}]])
-        fig.add_trace(
-            go.Scatter(x=forecast["ds"], y=forecast["yhat"], name="Wind Speed"),
-            secondary_y=False
-        )
-        fig.add_trace(
-            go.Scatter(x=forecast["ds"], y=forecast["power_kW"], name="Power Output"),
-            secondary_y=True
-        )
+        fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], name="Wind Speed"), secondary_y=False)
+        fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["power_kW"], name="Power Output"), secondary_y=True)
 
         fig.update_layout(title="Wind Speed vs Power Output")
         fig.update_yaxes(title_text="Wind Speed (m/s)", secondary_y=False)
@@ -190,6 +181,5 @@ with tab3:
 
         st.plotly_chart(fig, use_container_width=True)
 
-# ------------------ FOOTER ------------------
 st.markdown("---")
-st.caption("Wind Energy Feasibility Dashboard | Built with Streamlit")
+st.caption("Wind Energy Feasibility Dashboard | Python 3.14 Compatible")
