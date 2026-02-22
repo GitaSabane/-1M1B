@@ -1,5 +1,6 @@
 🌬️ Wind Energy Feasibility Dashboard
-📌 Project Overview
+
+ Project Overview
 
 The Wind Energy Feasibility Dashboard is a Streamlit-based web application that analyzes historical wind speed data, forecasts future wind trends using time series modeling, and estimates potential energy production from wind turbines.
 
@@ -37,7 +38,7 @@ Pandas & NumPy – Data processing
 
 Plotly & Matplotlib – Data visualization
 
-🧠 How the Project Works
+ How the Project Works
 1️⃣ Data Input
 
 Users can:
@@ -155,6 +156,5 @@ Add downloadable PDF report generation
 
 👨‍💻 Author
 
-Your Name
-Wind Energy & Data Science Project
-Built with ❤️ using Python & Streamlit
+Gitabai Sabane
+
