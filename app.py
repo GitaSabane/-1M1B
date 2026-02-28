@@ -10,8 +10,6 @@ from sklearn.pipeline import Pipeline
 import warnings
 from datetime import datetime, timedelta
 import base64
-from PIL import Image
-import io
 
 warnings.filterwarnings("ignore")
 
@@ -42,7 +40,7 @@ st.markdown("""
     }
     
     /* Card styling */
-    .css-1r6slb0 {
+    .stCard {
         border-radius: 10px;
         background: white;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -225,15 +223,6 @@ with st.sidebar:
 
         if turbine_model != "⚙️ Custom":
             cut_in_speed, rated_speed, cut_out_speed, rated_power = turbine_specs[turbine_model]
-            
-            # Display turbine specs nicely
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Cut-in Speed", f"{cut_in_speed} m/s")
-                st.metric("Cut-out Speed", f"{cut_out_speed} m/s")
-            with col2:
-                st.metric("Rated Speed", f"{rated_speed} m/s")
-                st.metric("Rated Power", f"{rated_power} kW")
         else:
             cut_in_speed = st.slider("Cut-in Speed (m/s)", 2.0, 5.0, 3.0, 0.1)
             rated_speed = st.slider("Rated Speed (m/s)", 10.0, 15.0, 12.0, 0.1)
@@ -453,11 +442,17 @@ with tab2:
 
             # Create future time indices
             future_index = np.arange(len(df) + forecast_days)
+            
+            # Create future dates properly
+            last_date = df["ds"].iloc[-1]
             future_dates = pd.date_range(
-                start=df["ds"].iloc[0],
-                periods=len(future_index),
+                start=last_date + pd.Timedelta(days=1),
+                periods=forecast_days,
                 freq="D"
             )
+            
+            # Combine historical and future dates
+            all_dates = pd.concat([df["ds"], pd.Series(future_dates)]).reset_index(drop=True)
 
             # Make predictions
             future_df = pd.DataFrame({"time_index": future_index})
@@ -475,7 +470,7 @@ with tab2:
 
             # Create forecast dataframe
             forecast = pd.DataFrame({
-                "ds": future_dates,
+                "ds": all_dates,
                 "yhat": predictions,
                 "yhat_lower": confidence_lower,
                 "yhat_upper": confidence_upper
@@ -491,6 +486,10 @@ with tab2:
     if "forecast" in st.session_state:
         forecast = st.session_state.forecast
         
+        # Separate historical and forecast periods
+        historical_forecast = forecast.iloc[:len(df)]
+        future_forecast = forecast.iloc[len(df):]
+        
         # Forecast metrics
         st.markdown("### 📊 Forecast Summary")
         
@@ -500,7 +499,7 @@ with tab2:
             st.markdown(f"""
             <div class="metric-card" style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);'>
                 <h3 style='margin:0; font-size:1rem; opacity:0.9;'>Forecast Mean</h3>
-                <p style='margin:0; font-size:2rem; font-weight:700;'>{forecast['yhat'].mean():.1f}</p>
+                <p style='margin:0; font-size:2rem; font-weight:700;'>{future_forecast['yhat'].mean():.1f}</p>
                 <p style='margin:0; font-size:0.9rem;'>m/s</p>
             </div>
             """, unsafe_allow_html=True)
@@ -509,13 +508,13 @@ with tab2:
             st.markdown(f"""
             <div class="metric-card" style='background: linear-gradient(135deg, #f6b23d 0%, #f5a623 100%);'>
                 <h3 style='margin:0; font-size:1rem; opacity:0.9;'>Forecast Max</h3>
-                <p style='margin:0; font-size:2rem; font-weight:700;'>{forecast['yhat'].max():.1f}</p>
+                <p style='margin:0; font-size:2rem; font-weight:700;'>{future_forecast['yhat'].max():.1f}</p>
                 <p style='margin:0; font-size:0.9rem;'>m/s</p>
             </div>
             """, unsafe_allow_html=True)
         
         with col3:
-            trend = forecast['yhat'].iloc[-1] - forecast['yhat'].iloc[len(df)]
+            trend = future_forecast['yhat'].iloc[-1] - future_forecast['yhat'].iloc[0]
             trend_color = "green" if trend > 0 else "red"
             st.markdown(f"""
             <div class="metric-card" style='background: linear-gradient(135deg, #a8e6cf 0%, #3cb371 100%);'>
@@ -526,7 +525,7 @@ with tab2:
             """, unsafe_allow_html=True)
         
         with col4:
-            uncertainty = (forecast['yhat_upper'] - forecast['yhat_lower']).mean()
+            uncertainty = (future_forecast['yhat_upper'] - future_forecast['yhat_lower']).mean()
             st.markdown(f"""
             <div class="metric-card" style='background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);'>
                 <h3 style='margin:0; font-size:1rem; opacity:0.9;'>Uncertainty</h3>
@@ -550,8 +549,8 @@ with tab2:
         
         # Forecast data
         fig2.add_trace(go.Scatter(
-            x=forecast["ds"], 
-            y=forecast["yhat"], 
+            x=future_forecast["ds"], 
+            y=future_forecast["yhat"], 
             mode="lines",
             name="Forecast",
             line=dict(color='#f6b23d', width=3),
@@ -561,8 +560,8 @@ with tab2:
         # Confidence intervals
         if show_confidence:
             fig2.add_trace(go.Scatter(
-                x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1],
-                y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
+                x=pd.concat([future_forecast["ds"], future_forecast["ds"][::-1]]),
+                y=pd.concat([future_forecast["yhat_upper"], future_forecast["yhat_lower"][::-1]]),
                 fill='toself',
                 fillcolor='rgba(246, 178, 61, 0.2)',
                 line=dict(color='rgba(255,255,255,0)'),
@@ -570,15 +569,28 @@ with tab2:
                 hoverinfo='skip'
             ))
         
-        # Add vertical line
-        fig2.add_vline(
-            x=df["ds"].iloc[-1], 
-            line_width=2, 
-            line_dash="dash", 
-            line_color="#666",
-            annotation_text="Forecast Start",
-            annotation_position="top right",
-            annotation_font=dict(size=12)
+        # Add vertical line using a shape instead of vline to avoid timestamp issues
+        fig2.add_shape(
+            type="line",
+            x0=df["ds"].iloc[-1],
+            y0=0,
+            x1=df["ds"].iloc[-1],
+            y1=1,
+            yref="paper",
+            line=dict(color="#666", width=2, dash="dash"),
+        )
+        
+        # Add annotation separately
+        fig2.add_annotation(
+            x=df["ds"].iloc[-1],
+            y=1,
+            yref="paper",
+            text="Forecast Start",
+            showarrow=True,
+            arrowhead=2,
+            ax=40,
+            ay=-40,
+            font=dict(size=12)
         )
         
         fig2.update_layout(
@@ -609,7 +621,7 @@ with tab2:
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            forecast_display = forecast.copy()
+            forecast_display = future_forecast.copy()
             forecast_display['ds'] = forecast_display['ds'].dt.date
             forecast_display.columns = ['Date', 'Forecast', 'Lower Bound', 'Upper Bound']
             
@@ -627,7 +639,7 @@ with tab2:
         
         with col2:
             st.markdown("### ⬇️ Download")
-            csv = forecast.to_csv(index=False)
+            csv = future_forecast.to_csv(index=False)
             st.download_button(
                 label="📥 Forecast CSV",
                 data=csv,
@@ -680,6 +692,7 @@ with tab3:
         """, unsafe_allow_html=True)
     else:
         forecast = st.session_state.forecast
+        future_forecast = forecast.iloc[len(df):]
         
         # Power calculation function with cubic curve
         def calculate_power(ws):
@@ -692,18 +705,18 @@ with tab3:
                 return rated_power
 
         # Calculate power for each forecast point
-        forecast["power_kW"] = forecast["yhat"].apply(calculate_power)
+        future_forecast["power_kW"] = future_forecast["yhat"].apply(calculate_power)
         
         # Calculate confidence intervals for power
-        forecast["power_lower"] = forecast["yhat_lower"].apply(calculate_power)
-        forecast["power_upper"] = forecast["yhat_upper"].apply(calculate_power)
+        future_forecast["power_lower"] = future_forecast["yhat_lower"].apply(calculate_power)
+        future_forecast["power_upper"] = future_forecast["yhat_upper"].apply(calculate_power)
 
         # Energy metrics
-        avg_power = forecast["power_kW"].mean()
+        avg_power = future_forecast["power_kW"].mean()
         capacity_factor = (avg_power / rated_power) * 100 if rated_power > 0 else 0
         daily_energy = avg_power * 24 / 1000  # MWh
         annual_energy = avg_power * 24 * 365 / 1000  # MWh
-        total_energy = forecast["power_kW"].sum() * 24 / 1000  # Total MWh over forecast period
+        total_energy = future_forecast["power_kW"].sum() * 24 / 1000  # Total MWh over forecast period
 
         # Energy metrics in attractive cards
         st.markdown("### 📊 Energy Production Metrics")
@@ -785,8 +798,8 @@ with tab3:
         # Time series of power output
         fig3.add_trace(
             go.Scatter(
-                x=forecast["ds"],
-                y=forecast["power_kW"],
+                x=future_forecast["ds"],
+                y=future_forecast["power_kW"],
                 mode="lines",
                 name="Power Output",
                 line=dict(color='#3cb371', width=2),
@@ -800,8 +813,8 @@ with tab3:
         # Add confidence bands for power
         fig3.add_trace(
             go.Scatter(
-                x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1],
-                y=forecast["power_upper"].tolist() + forecast["power_lower"].tolist()[::-1],
+                x=pd.concat([future_forecast["ds"], future_forecast["ds"][::-1]]),
+                y=pd.concat([future_forecast["power_upper"], future_forecast["power_lower"][::-1]]),
                 fill='toself',
                 fillcolor='rgba(60, 179, 113, 0.2)',
                 line=dict(color='rgba(255,255,255,0)'),
@@ -835,7 +848,7 @@ with tab3:
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            energy_data = forecast[['ds', 'yhat', 'power_kW', 'power_lower', 'power_upper']].copy()
+            energy_data = future_forecast[['ds', 'yhat', 'power_kW', 'power_lower', 'power_upper']].copy()
             energy_data['ds'] = energy_data['ds'].dt.date
             energy_data.columns = ['Date', 'Wind Speed (m/s)', 'Power (kW)', 'Power Lower (kW)', 'Power Upper (kW)']
             
@@ -856,8 +869,8 @@ with tab3:
             st.markdown("### 📊 Summary")
             
             # Additional metrics
-            operating_hours = (forecast['power_kW'] > 0).sum() / len(forecast) * 100
-            peak_power_hours = (forecast['power_kW'] > rated_power * 0.9).sum()
+            operating_hours = (future_forecast['power_kW'] > 0).sum() / len(future_forecast) * 100
+            peak_power_hours = (future_forecast['power_kW'] > rated_power * 0.9).sum()
             
             st.markdown(f"""
             <div style='background: #f8f9fa; padding: 1rem; border-radius: 10px;'>
@@ -870,7 +883,7 @@ with tab3:
             """, unsafe_allow_html=True)
             
             # Download button
-            csv = forecast.to_csv(index=False)
+            csv = future_forecast.to_csv(index=False)
             st.download_button(
                 label="📥 Download Energy Data",
                 data=csv,
@@ -884,7 +897,7 @@ st.markdown("""
 <div class="footer">
     <p style='margin:0; font-size:1.2rem;'>🌬️ Wind Energy Feasibility Dashboard</p>
     <p style='margin:0; font-size:0.9rem; opacity:0.9;'>Powered by Advanced Analytics | Real-time Predictions | Energy Optimization</p>
-    <p style='margin:0; font-size:0.8rem; opacity:0.8; margin-top:1rem;'>© 2026 | Built with Streamlit | Python 3.14 Compatible</p>
+    <p style='margin:0; font-size:0.8rem; opacity:0.8; margin-top:1rem;'>© 2024 | Built with Streamlit | Python 3.14 Compatible</p>
 </div>
 """, unsafe_allow_html=True)
 
