@@ -897,7 +897,7 @@ st.markdown("""
 <div class="footer">
     <p style='margin:0; font-size:1.2rem;'>🌬️ Wind Energy Feasibility Dashboard</p>
     <p style='margin:0; font-size:0.9rem; opacity:0.9;'>Powered by Advanced Analytics | Real-time Predictions | Energy Optimization</p>
-    <p style='margin:0; font-size:0.8rem; opacity:0.8; margin-top:1rem;'>© 2024 | Built with Streamlit | Python 3.14 Compatible</p>
+    <p style='margin:0; font-size:0.8rem; opacity:0.8; margin-top:1rem;'>© 2026 | Built with Streamlit | Python 3.14 Compatible</p>
 </div>
 """, unsafe_allow_html=True)
 
